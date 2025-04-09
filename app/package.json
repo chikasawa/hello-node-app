@@ -1,0 +1,14 @@
+{
+    "name": "hello-node-app",
+    "version": "1.0.0",
+    "description": "Simple Hello World Node.js App",
+    "main": "app.js",
+    "scripts": {
+      "start": "node app.js"
+    },
+    "dependencies": {
+      "express": "^4.18.2"
+    },
+    "author": "Robson Chikasawa",
+    "license": "ISC"
+  }

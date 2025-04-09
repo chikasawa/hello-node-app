@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  app:
+    # IMPORTANTE para CI/CD: Use a imagem que será construída e enviada pelo GitHub Actions
+    # Substitua 'seu-usuario-dockerhub/hello-node-app' pelo nome da sua imagem no registry
+    # image: chikasawa/hello-node-app:latest
+    # Para desenvolvimento local, você pode descomentar 'build' e comentar 'image':
+    build:
+      context: . # Constrói a imagem usando o Dockerfile na raiz
+      dockerfile: Dockerfile
+    container_name: hello-node-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production # Define ambiente de produção
+      PORT: 3000          # Garante que a porta no Node.js é 3000
+    networks:
+      - hello-network # Conecta à rede definida abaixo
+
+  nginx:
+    image: nginx:alpine
+    container_name: hello-nginx-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80" # Mapeia a porta 80 do host para a porta 80 do container Nginx
+      # - "443:443" # Descomente se configurar HTTPS
+    volumes:
+      # Mapeia o arquivo de configuração local para dentro do container Nginx
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Volumes para certificados SSL (se usar HTTPS)
+      # - ./certs:/etc/nginx/certs:ro
+      # Volume para logs (opcional, mas útil)
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - app # Garante que o 'app' inicie antes (ou pelo menos seja iniciado)
+    networks:
+      - hello-network
+
+networks:
+  hello-network:
+    driver: bridge # Rede padrão para comunicação entre containers
+
+volumes:
+  nginx-logs: # Define um volume nomeado para persistir os logs do Nginx

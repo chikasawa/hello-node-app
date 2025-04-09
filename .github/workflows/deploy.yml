@@ -1,0 +1,63 @@
+name: Deploy Hello World to VPS
+
+on:
+  pull_request:
+    types: [closed] # Aciona quando um PR é fechado
+    branches:
+      - main        # Apenas para PRs direcionados à branch 'main'
+
+jobs:
+  deploy:
+    # Só executa se o PR foi realmente mesclado
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest # Ambiente de execução do workflow
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub # Ou outro registry (GitHub Container Registry, etc.)
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }} # Use um token de acesso, não a senha
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: . # Contexto da build (raiz do projeto)
+          file: ./Dockerfile # Caminho para o Dockerfile
+          push: true # Envia a imagem para o registry
+          tags: seu-usuario-dockerhub/hello-node-app:latest # Substitua pelo nome da sua imagem:tag
+          # Opcional: Cache para acelerar builds futuras
+          cache-from: type=registry,ref=seu-usuario-dockerhub/hello-node-app:buildcache
+          cache-to: type=registry,ref=seu-usuario-dockerhub/hello-node-app:buildcache,mode=max
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }} # IP ou hostname do seu VPS
+          username: ${{ secrets.VPS_USERNAME }} # Usuário no VPS para deploy (veja passo 6)
+          key: ${{ secrets.VPS_SSH_KEY }} # Chave SSH privada para conectar ao VPS
+          port: ${{ secrets.VPS_SSH_PORT || 22 }} # Porta SSH (padrão 22)
+          script: |
+            # Navega para o diretório da aplicação no VPS
+            cd /path/to/your/app/directory # <<< MUDE ESTE CAMINHO
+
+            # Opcional: Logar no Docker Hub no VPS se a imagem for privada
+            # echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+
+            # Puxa a imagem mais recente definida no docker-compose.yml (serviço 'app')
+            docker-compose pull app
+
+            # Para e remove containers antigos, volumes anônimos e a rede
+            # docker-compose down --remove-orphans # Use com cuidado se outros apps usarem a rede
+
+            # Sobe os serviços com a nova imagem (em modo detached -d)
+            docker-compose up -d --remove-orphans
+
+            # Opcional: Limpa imagens Docker antigas e não utilizadas
+            docker image prune -f
